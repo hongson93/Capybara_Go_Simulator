@@ -70,6 +70,9 @@ class BattleState:
 
     rng: Optional[random.Random] = None
 
+    # All active effects for this battle (filled by the simulator)
+    effects: list = field(default_factory=list, repr=False)
+
     # Debugging
     debug: bool = False
     debug_logs: list = field(default_factory=list)
@@ -244,6 +247,7 @@ def simulate_adventurer(
     lightning_charge_step: float = 0.0,
 ) -> BattleState:
     state = BattleState()
+    state.effects = effects
     state.rng = random.Random(seed) if seed is not None else random.Random()
     state.debug = debug
     state.debug_logs = []
@@ -347,6 +351,7 @@ def simulate_adventurer_with_log(
     lightning_charge_step: float = 0.0,
 ):
     state = BattleState()
+    state.effects = effects
     state.rng = random.Random(seed) if seed is not None else random.Random()
     state.debug = debug
     state.debug_logs = []

@@ -88,6 +88,10 @@ class NashirScepterEffect(BaseEffect):
             M_bolt = self._bolt_mult()
             state.dmg_bolt += dmg * M_bolt
 
+            for e in state.effects:
+                if hasattr(e, "on_after_bolt"):
+                    e.on_after_bolt(state, bolt_ctx)
+
             if is_thunder:
                 self.bolt_stacks = min(self.bolt_stacks + 1.0, self.max_bolt_stacks)
 

@@ -49,6 +49,9 @@ class ExtraEndOfRoundBoltsEffect(BaseEffect):
                 dmg = compute_hit_damage(bolt_ctx, state)
                 state.dmg_other += dmg
 
+                for e in state.effects:
+                    if hasattr(e, "on_after_bolt"):
+                        e.on_after_bolt(state, bolt_ctx)
 
 class BasicAttackBoltEffect(BaseEffect):
     """
@@ -96,6 +99,9 @@ class BasicAttackBoltEffect(BaseEffect):
                 dmg = compute_hit_damage(bolt_ctx, state)
                 state.dmg_other += dmg
 
+                for e in state.effects:
+                    if hasattr(e, "on_after_bolt"):
+                        e.on_after_bolt(state, bolt_ctx)
 
 class FiveBoltsAfterRound6Effect(BaseEffect):
     """
@@ -137,3 +143,7 @@ class FiveBoltsAfterRound6Effect(BaseEffect):
                 )
                 dmg = compute_hit_damage(bolt_ctx, state)
                 state.dmg_other += dmg
+
+                for e in state.effects:
+                    if hasattr(e, "on_after_bolt"):
+                        e.on_after_bolt(state, bolt_ctx)
