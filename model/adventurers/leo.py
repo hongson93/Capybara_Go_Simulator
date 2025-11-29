@@ -67,7 +67,7 @@ class LeoMultiHitNinjutsuEffect(BaseEffect):
             if self.has_2star:
                 if rng.random() < 0.70:
                     ninj_ctx = HitContext(
-                        damage_type=DamageType.OTHER_SKILL,
+                        damage_type=DamageType.NINJUTSU,
                         coeff=part_coeff,
                         atk_base=ctx.atk_base,
                         atk_mult_adventurer=self.adv_atk_mult,
@@ -76,11 +76,12 @@ class LeoMultiHitNinjutsuEffect(BaseEffect):
                         tags={"skill", "ninjutsu", "basic"},
                     )
                     dmg_ninj = compute_hit_damage(ninj_ctx, state)
-                    state.dmg_other += dmg_ninj
+                    state.dmg_ninjutsu += dmg_ninj
+
 
         # 0★/2★: after the 3 hits, always 1× 100% ninjutsu
         ninj_final_ctx = HitContext(
-            damage_type=DamageType.OTHER_SKILL,
+            damage_type=DamageType.NINJUTSU,
             coeff=1.0,
             atk_base=ctx.atk_base,
             atk_mult_adventurer=self.adv_atk_mult,
@@ -89,7 +90,8 @@ class LeoMultiHitNinjutsuEffect(BaseEffect):
             tags={"skill", "ninjutsu"},
         )
         dmg_final = compute_hit_damage(ninj_final_ctx, state)
-        state.dmg_other += dmg_final
+        state.dmg_ninjutsu += dmg_final
+
 
 
 class LeoHurricaneEffect(BaseEffect):
@@ -120,14 +122,15 @@ class LeoHurricaneEffect(BaseEffect):
         # Hurricane: 5 ninjutsu hits
         for _ in range(5):
             ctx = HitContext(
-                damage_type=DamageType.OTHER_SKILL,
+                damage_type=DamageType.HURRICANE,
                 coeff=self.coeff,
                 atk_mult_adventurer=self.adv_atk_mult,
                 global_bonus=state.breath_global_this,  # global buffs
                 tags={"skill", "ninjutsu"},
             )
             dmg = compute_hit_damage(ctx, state)
-            state.dmg_other += dmg
+            state.dmg_hurricane += dmg
+
 
 
 class LeoLightningNinjutsuFlagEffect(BaseEffect):
@@ -171,14 +174,15 @@ class LeoChargeReleaseNinjutsuEffect(BaseEffect):
         # Extra ninjutsu hits before the 6 bolts
         for _ in range(3):
             ctx = HitContext(
-                damage_type=DamageType.OTHER_SKILL,
+                damage_type=DamageType.ULTIMATE,
                 coeff=self.coeff,
                 atk_mult_adventurer=self.adv_atk_mult,
                 global_bonus=state.breath_global_this,
                 tags={"skill", "ninjutsu"},
             )
             dmg = compute_hit_damage(ctx, state)
-            state.dmg_other += dmg
+            state.dmg_ultimate += dmg
+
 
         # Leo 10★: one-time +60% global ninjutsu
         if self.grant_global_ninjutsu and not self.global_buff_applied:

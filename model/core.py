@@ -19,6 +19,12 @@ class DamageType:
     DRAGON_BREATH = "dragon_breath"
     OTHER_SKILL = "other_skill"
 
+    # Leo-specific types
+    NINJUTSU = "ninjutsu"
+    HURRICANE = "hurricane"
+    ULTIMATE = "ultimate"
+
+
 
 # =========================
 # Battle state & hit context
@@ -73,9 +79,14 @@ class BattleState:
     dmg_basic: float = 0.0
     dmg_flame: float = 0.0
     dmg_breath: float = 0.0
-    dmg_other: float = 0.0
+    dmg_other: float = 0.0        # generic misc skill damage
     dmg_bolt: float = 0.0
     dmg_artifact: float = 0.0
+
+    # Leo-specific breakdowns
+    dmg_ninjutsu: float = 0.0     # 0★/2★ ninjutsu procs
+    dmg_hurricane: float = 0.0    # 4★/7★ Hurricane
+    dmg_ultimate: float = 0.0     # 8★/10★ charge-release
 
     rng: Optional[random.Random] = None
 
