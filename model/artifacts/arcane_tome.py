@@ -68,8 +68,7 @@ class ArcaneTomeEffect(BaseEffect):
                 tags={"skill", "lightning", "artifact"},
             )
             dmg = compute_hit_damage(tome_ctx, state)
-
-            state.dmg_other += dmg
+            state.dmg_artifact += dmg
 
     # Optional: make on_after_hit a no-op to avoid confusion
     def on_after_hit(self, state: BattleState, ctx: HitContext) -> None:

@@ -37,6 +37,11 @@ def get_config():
         use_ezra_ring=True,
         ezra_final_light_bonus=0.20,  # +20% final lightning per round
 
+        # --- Artifact: Arcane Tome ---
+        artifact="ArcaneTome",   # enable Tome
+        artifact_level=1,        # 1 = base (4 bolts, 500%), 2 = upgrade (3 bolts, 750%)
+
+
         # --- Battle settings ---
         rounds=15,
         basic_hits_per_round=5,

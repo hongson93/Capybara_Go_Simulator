@@ -45,6 +45,8 @@ class BattleState:
 
     base_global_lightning_bonus: float = 0.0   # +X% global dmg to lightning hits
     base_global_skill_bonus: float = 0.0       # +X% global dmg to skill hits
+    base_global_ninjutsu_bonus: float = 0.0    # +X% global dmg to ninjutsu hits
+
     base_final_skill_bonus: float = 0.0        # +X% final dmg to skill hits
     base_final_lightning_bonus: float = 0.0    # +X% final dmg to lightning hits
 
@@ -53,13 +55,19 @@ class BattleState:
     base_inbattle_skill_bonus: float = 0.0
     base_inbattle_lightning_bonus: float = 0.0
 
-    # NEW: Lightning Charge (dynamic in-battle lightning buff from bolts)
+    # Lightning Charge (dynamic in-battle lightning buff from bolts)
     lightning_charge_step: float = 0.0              # per-bolt increment (0.06 or 0.10)
-    lightning_charge_stacks: int = 0                  # number of bolts hit in current cycle
+    lightning_charge_stacks: int = 0                # number of bolts hit in current cycle
     dynamic_inbattle_lightning_bonus: float = 0.0   # accumulated bonus from bolts
 
-    # NEW: temporary final lightning bonus (e.g. Ezra Ring)
+    # Temporary final lightning bonus (e.g. Ezra Ring)
     temp_final_lightning_bonus: float = 0.0
+
+    # Ninjutsu global bonus (e.g. Leo 10★)
+    dynamic_global_ninjutsu_bonus: float = 0.0  # Leo 10★ sets +0.6 here
+
+    # Leo 5★: lightning hits gain "ninjutsu" tag
+    lightning_as_ninjutsu: bool = False
 
     # Damage accumulators
     dmg_basic: float = 0.0
@@ -67,6 +75,7 @@ class BattleState:
     dmg_breath: float = 0.0
     dmg_other: float = 0.0
     dmg_bolt: float = 0.0
+    dmg_artifact: float = 0.0
 
     rng: Optional[random.Random] = None
 
@@ -155,8 +164,8 @@ def debug_log_hit(
         "inbattle_total": inbattle_total,
         "final_total": final_total,
         "damage": dmg,
-        "lc_stacks": state.lightning_charge_stacks,            # NEW
-        "lc_bonus": state.dynamic_inbattle_lightning_bonus,    # NEW
+        "lc_stacks": state.lightning_charge_stacks,
+        "lc_bonus": state.dynamic_inbattle_lightning_bonus,
     })
 
 
@@ -180,6 +189,9 @@ def compute_hit_damage(ctx: HitContext, state: BattleState) -> float:
         global_total += state.base_global_skill_bonus
     if "lightning" in ctx.tags:
         global_total += state.base_global_lightning_bonus
+    if "ninjutsu" in ctx.tags:
+        global_total += state.base_global_ninjutsu_bonus
+        global_total += state.dynamic_global_ninjutsu_bonus
 
     # --- In-battle bracket ---
     inbattle_total = ctx.inbattle_bonus + state.base_inbattle_bonus
@@ -189,7 +201,7 @@ def compute_hit_damage(ctx: HitContext, state: BattleState) -> float:
         inbattle_total += state.base_inbattle_skill_bonus
     if "lightning" in ctx.tags:
         inbattle_total += state.base_inbattle_lightning_bonus
-        inbattle_total += state.dynamic_inbattle_lightning_bonus 
+        inbattle_total += state.dynamic_inbattle_lightning_bonus
 
     # --- Final bracket ---
     final_total = ctx.final_bonus + state.base_final_bonus
@@ -222,7 +234,6 @@ def compute_hit_damage(ctx: HitContext, state: BattleState) -> float:
     return dmg
 
 
-
 # =========================
 # Generic simulator
 # =========================
@@ -238,6 +249,7 @@ def simulate_adventurer(
     base_final_bonus: float = 0.0,
     base_global_skill_bonus: float = 0.0,
     base_global_lightning_bonus: float = 0.0,
+    base_global_ninjutsu_bonus: float = 0.0,
     base_final_skill_bonus: float = 0.0,
     base_final_lightning_bonus: float = 0.0,
     base_inbattle_basic_bonus: float = 0.0,
@@ -259,6 +271,8 @@ def simulate_adventurer(
 
     state.base_global_skill_bonus = base_global_skill_bonus
     state.base_global_lightning_bonus = base_global_lightning_bonus
+    state.base_global_ninjutsu_bonus = base_global_ninjutsu_bonus
+
     state.base_final_skill_bonus = base_final_skill_bonus
     state.base_final_lightning_bonus = base_final_lightning_bonus
 
@@ -266,10 +280,14 @@ def simulate_adventurer(
     state.base_inbattle_skill_bonus = base_inbattle_skill_bonus
     state.base_inbattle_lightning_bonus = base_inbattle_lightning_bonus
 
-    # NEW: Lightning Charge
+    # Lightning Charge
     state.lightning_charge_step = lightning_charge_step
     state.dynamic_inbattle_lightning_bonus = 0.0
     state.lightning_charge_stacks = 0
+
+    # Ninjutsu dynamic buff + lightning-as-ninjutsu default
+    state.dynamic_global_ninjutsu_bonus = 0.0
+    state.lightning_as_ninjutsu = False
 
     for r in range(1, rounds + 1):
         state.round_index = r
@@ -316,7 +334,7 @@ def simulate_adventurer(
             if hasattr(e, "on_end_round_buffs_expire"):
                 e.on_end_round_buffs_expire(state)
 
-        # 🔄 Lightning Charge reset every 3 rounds,
+        # Lightning Charge reset every 3 rounds,
         # AFTER buffs expire, BEFORE charge release
         if state.lightning_charge_step > 0.0 and (state.round_index % 3 == 0):
             state.lightning_charge_stacks = 0
@@ -326,7 +344,6 @@ def simulate_adventurer(
         for e in effects:
             if hasattr(e, "on_end_round_charge_release"):
                 e.on_end_round_charge_release(state)
-
 
     return state
 
@@ -342,6 +359,7 @@ def simulate_adventurer_with_log(
     base_final_bonus: float = 0.0,
     base_global_skill_bonus: float = 0.0,
     base_global_lightning_bonus: float = 0.0,
+    base_global_ninjutsu_bonus: float = 0.0,
     base_final_skill_bonus: float = 0.0,
     base_final_lightning_bonus: float = 0.0,
     base_inbattle_basic_bonus: float = 0.0,
@@ -362,6 +380,8 @@ def simulate_adventurer_with_log(
 
     state.base_global_skill_bonus = base_global_skill_bonus
     state.base_global_lightning_bonus = base_global_lightning_bonus
+    state.base_global_ninjutsu_bonus = base_global_ninjutsu_bonus
+
     state.base_final_skill_bonus = base_final_skill_bonus
     state.base_final_lightning_bonus = base_final_lightning_bonus
 
@@ -369,10 +389,14 @@ def simulate_adventurer_with_log(
     state.base_inbattle_skill_bonus = base_inbattle_skill_bonus
     state.base_inbattle_lightning_bonus = base_inbattle_lightning_bonus
 
-    # NEW: Lightning Charge
+    # Lightning Charge
     state.lightning_charge_step = lightning_charge_step
     state.dynamic_inbattle_lightning_bonus = 0.0
     state.lightning_charge_stacks = 0
+
+    # Ninjutsu dynamic buff + lightning-as-ninjutsu default
+    state.dynamic_global_ninjutsu_bonus = 0.0
+    state.lightning_as_ninjutsu = False
 
     round_log = []
 
@@ -427,7 +451,7 @@ def simulate_adventurer_with_log(
             if hasattr(e, "on_end_round_buffs_expire"):
                 e.on_end_round_buffs_expire(state)
 
-        # 🔄 Lightning Charge reset every 3 rounds,
+        # Lightning Charge reset every 3 rounds,
         # AFTER buffs expire, BEFORE charge release
         if state.lightning_charge_step > 0.0 and (state.round_index % 3 == 0):
             state.lightning_charge_stacks = 0
@@ -437,7 +461,6 @@ def simulate_adventurer_with_log(
         for e in effects:
             if hasattr(e, "on_end_round_charge_release"):
                 e.on_end_round_charge_release(state)
-
 
         round_log.append({
             "round": r,
@@ -456,15 +479,17 @@ def simulate_adventurer_with_log(
 # =========================
 
 from model.adventurers.dragon_girl import dg_effects_for_star
+from model.adventurers.leo import leo_effects_for_star
 from model.weapons.nashir import NashirScepterEffect
 from model.skills.lightning import (
     ExtraEndOfRoundBoltsEffect,
     BasicAttackBoltEffect,
     FiveBoltsAfterRound6Effect,
 )
-from model.skills.combo_mastery import ComboMasteryEffect  # optional direct usage
+from model.skills.combo_mastery import ComboMasteryEffect
 from model.skills.ezra_ring import EzraRingEffect
 from model.artifacts.arcane_tome import ArcaneTomeEffect
+
 
 @dataclass
 class SimulationConfig:
@@ -476,7 +501,7 @@ class SimulationConfig:
 
     use_extra_end_bolts: bool = True
     extra_end_bolts_count: int = 3
-    basic_atk_bolt_level: int = 0
+    basic_atk_bolt_level: int = 0  # 0 = off, 1 = base, 2 = upgraded
     five_bolts_from_round6: bool = False
 
     rounds: int = 15
@@ -491,6 +516,7 @@ class SimulationConfig:
     # Type-specific global/final
     base_global_skill_bonus: float = 0.0
     base_global_lightning_bonus: float = 0.0
+    base_global_ninjutsu_bonus: float = 0.0
     base_final_skill_bonus: float = 0.0
     base_final_lightning_bonus: float = 0.0
 
@@ -499,17 +525,18 @@ class SimulationConfig:
     base_inbattle_skill_bonus: float = 0.0
     base_inbattle_lightning_bonus: float = 0.0
 
-    # NEW: Lightning Charge per-bolt step
+    # Lightning Charge per-bolt step
     lightning_charge_step: float = 0.0  # 0.06 for base, 0.10 for upgrade
     multiple_lightning_factor: int = 1
 
-    # NEW: Ezra Ring toggle & strength
+    # Ezra Ring toggle & strength
     use_ezra_ring: bool = False
     ezra_final_light_bonus: float = 0.20  # +20% final lightning for 1 round
 
-    # NEW: Artifact system
+    # Artifact system
     artifact: Optional[str] = None      # e.g. "ArcaneTome"
     artifact_level: int = 0            # 0 = off, 1 = base, 2 = upgraded
+
 
 def build_effects_from_config(config: SimulationConfig):
     effects: List[Effect] = []
@@ -519,7 +546,7 @@ def build_effects_from_config(config: SimulationConfig):
         effects.extend(dg_effects_for_star(config.star, config.combo_mastery))
         adv_atk_mult = 1.15
     elif config.adventurer == "Leo":
-        # TODO: plug Leo logic later
+        effects.extend(leo_effects_for_star(config.star, config.combo_mastery))
         adv_atk_mult = 1.10
     elif config.adventurer == "Daji":
         adv_atk_mult = 1.15
@@ -549,7 +576,19 @@ def build_effects_from_config(config: SimulationConfig):
         ))
 
     if config.basic_atk_bolt_level > 0:
-        chance = 0.45 if config.basic_atk_bolt_level == 1 else 0.80
+        # Base chances
+        if config.basic_atk_bolt_level == 1:
+            chance = 0.45
+        else:  # level 2 (upgrade)
+            chance = 0.75  # corrected: 75%, not 80%
+
+        # Leo passive: improved on-hit chance
+        if config.adventurer == "Leo":
+            if config.basic_atk_bolt_level == 1:
+                chance = 0.8336
+            else:  # upgraded
+                chance = 0.984
+
         effects.append(BasicAttackBoltEffect(
             adv_atk_mult=adv_atk_mult,
             chance=chance,
@@ -598,6 +637,7 @@ def run_simulation(config: SimulationConfig, with_log: bool = False):
         base_final_bonus=config.base_final_bonus,
         base_global_skill_bonus=config.base_global_skill_bonus,
         base_global_lightning_bonus=config.base_global_lightning_bonus,
+        base_global_ninjutsu_bonus=config.base_global_ninjutsu_bonus,
         base_final_skill_bonus=config.base_final_skill_bonus,
         base_final_lightning_bonus=config.base_final_lightning_bonus,
         base_inbattle_basic_bonus=config.base_inbattle_basic_bonus,

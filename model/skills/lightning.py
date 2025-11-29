@@ -37,6 +37,10 @@ class ExtraEndOfRoundBoltsEffect(BaseEffect):
         else:
             # Plain lightning: 30% coeff, no conversion, no bolt stacks
             for _ in range(total_bolts):
+                tags = {"skill", "lightning", "bolt"}
+                if state.lightning_as_ninjutsu:
+                    tags.add("ninjutsu")
+
                 bolt_ctx = HitContext(
                     damage_type=DamageType.OTHER_SKILL,
                     coeff=0.30,  # 30% lightning
@@ -44,7 +48,7 @@ class ExtraEndOfRoundBoltsEffect(BaseEffect):
                     atk_mult_buff=atk_mult_buff,
                     # breath_global_this and base_* bonuses are handled in compute_hit_damage
                     global_bonus=state.breath_global_this,
-                    tags={"skill", "lightning", "bolt"},
+                    tags=tags,
                 )
                 dmg = compute_hit_damage(bolt_ctx, state)
                 state.dmg_other += dmg
@@ -52,6 +56,7 @@ class ExtraEndOfRoundBoltsEffect(BaseEffect):
                 for e in state.effects:
                     if hasattr(e, "on_after_bolt"):
                         e.on_after_bolt(state, bolt_ctx)
+
 
 class BasicAttackBoltEffect(BaseEffect):
     """
@@ -69,7 +74,7 @@ class BasicAttackBoltEffect(BaseEffect):
         multi_factor: int = 1,
     ):
         self.adv_atk_mult = adv_atk_mult
-        self.chance = chance  # 0.45 or 0.80
+        self.chance = chance  # 0.45 or 0.75, or boosted for Leo
         self.nashir = nashir
         self.multi_factor = multi_factor
 
@@ -88,13 +93,17 @@ class BasicAttackBoltEffect(BaseEffect):
             self.nashir.process_lightning_bolt(state, atk_mult_buff, count=n_bolts)
         else:
             for _ in range(n_bolts):
+                tags = {"skill", "lightning", "bolt"}
+                if state.lightning_as_ninjutsu:
+                    tags.add("ninjutsu")
+
                 bolt_ctx = HitContext(
                     damage_type=DamageType.OTHER_SKILL,
                     coeff=0.30,
                     atk_mult_adventurer=self.adv_atk_mult,
                     atk_mult_buff=atk_mult_buff,
                     global_bonus=state.breath_global_this,
-                    tags={"skill", "lightning", "bolt"},
+                    tags=tags,
                 )
                 dmg = compute_hit_damage(bolt_ctx, state)
                 state.dmg_other += dmg
@@ -102,6 +111,7 @@ class BasicAttackBoltEffect(BaseEffect):
                 for e in state.effects:
                     if hasattr(e, "on_after_bolt"):
                         e.on_after_bolt(state, bolt_ctx)
+
 
 class FiveBoltsAfterRound6Effect(BaseEffect):
     """
@@ -133,13 +143,17 @@ class FiveBoltsAfterRound6Effect(BaseEffect):
             self.nashir.process_lightning_bolt(state, atk_mult_buff, count=total_bolts)
         else:
             for _ in range(total_bolts):
+                tags = {"skill", "lightning", "bolt"}
+                if state.lightning_as_ninjutsu:
+                    tags.add("ninjutsu")
+
                 bolt_ctx = HitContext(
                     damage_type=DamageType.OTHER_SKILL,
                     coeff=0.30,
                     atk_mult_adventurer=self.adv_atk_mult,
                     atk_mult_buff=atk_mult_buff,
                     global_bonus=state.breath_global_this,
-                    tags={"skill", "lightning", "bolt"},
+                    tags=tags,
                 )
                 dmg = compute_hit_damage(bolt_ctx, state)
                 state.dmg_other += dmg

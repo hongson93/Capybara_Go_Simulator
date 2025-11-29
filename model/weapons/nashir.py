@@ -1,6 +1,7 @@
 from model.core import BaseEffect, BattleState, HitContext, DamageType, compute_hit_damage, ATK_BASE, K_SKILL
 import random  # if needed
 
+
 class NashirScepterEffect(BaseEffect):
     """
     Nashir Scepter:
@@ -75,19 +76,24 @@ class NashirScepterEffect(BaseEffect):
             else:
                 coeff = self.base_lightning_coeff
 
+            tags = {"skill", "lightning", "bolt"}
+            if state.lightning_as_ninjutsu:
+                tags.add("ninjutsu")
+
             bolt_ctx = HitContext(
                 damage_type=DamageType.OTHER_SKILL,
                 coeff=coeff,
                 atk_mult_adventurer=self.adv_atk_mult,
                 atk_mult_buff=atk_mult_buff,
                 global_bonus=global_bonus,
-                tags={"skill", "lightning", "bolt"}
+                tags=tags,
             )
             dmg = compute_hit_damage(bolt_ctx, state)
 
             M_bolt = self._bolt_mult()
             state.dmg_bolt += dmg * M_bolt
 
+            # Notify bolt listeners (Arcane Tome, Lightning Charge debug, etc.)
             for e in state.effects:
                 if hasattr(e, "on_after_bolt"):
                     e.on_after_bolt(state, bolt_ctx)
@@ -97,9 +103,8 @@ class NashirScepterEffect(BaseEffect):
 
     def on_end_round_skills(self, state: BattleState) -> None:
         atk_mult_buff = self._atk_buff_mult(state)
-        # weapon's own +1 bolt
+        # Weapon's own +1 bolt
         self.process_lightning_bolt(state, atk_mult_buff, count=1)
-
 
     def on_end_round_charge_release(self, state: BattleState) -> None:
         """
@@ -110,19 +115,33 @@ class NashirScepterEffect(BaseEffect):
         global_bonus = self._global_bonus_common(state)
 
         if self.charge_level == 3:
+            # Let other effects (e.g. Leo) react before the bolts
+            for e in state.effects:
+                if hasattr(e, "on_before_charge_release"):
+                    e.on_before_charge_release(state)
+
             for _ in range(6):
                 coeff = self._thunder_coeff()
+                tags = {"skill", "lightning", "bolt"}
+                if state.lightning_as_ninjutsu:
+                    tags.add("ninjutsu")
+
                 thunder_ctx = HitContext(
                     damage_type=DamageType.OTHER_SKILL,
                     coeff=coeff,
                     atk_mult_adventurer=self.adv_atk_mult,
                     atk_mult_buff=atk_mult_buff,
                     global_bonus=global_bonus,
-                    tags={"skill", "lightning", "bolt"},
+                    tags=tags,
                 )
                 dmg_thunder = compute_hit_damage(thunder_ctx, state)
                 M_bolt = self._bolt_mult()
                 state.dmg_bolt += dmg_thunder * M_bolt
+
+                # Notify bolt listeners
+                for e in state.effects:
+                    if hasattr(e, "on_after_bolt"):
+                        e.on_after_bolt(state, thunder_ctx)
 
                 # each real thunder bolt adds 1 stack
                 self.bolt_stacks = min(self.bolt_stacks + 1.0, self.max_bolt_stacks)
@@ -131,7 +150,7 @@ class NashirScepterEffect(BaseEffect):
         if self.charge_level < 3:
             self.charge_level += 1
         else:
-            # after releasing at level 3, reset to level 1 for next round
+        # after releasing at level 3, reset to level 1 for next round
             self.charge_level = 1
 
     # keep old on_round_end as no-op
