@@ -27,10 +27,16 @@ class BattleState:
     # Combo mastery
     combo_stacks: int = 0
 
-    # Base multipliers (global defaults from config)
-    base_global_bonus: float = 0.0
-    base_inbattle_bonus: float = 0.0
-    base_final_bonus: float = 0.0
+    # Base multipliers (from config)
+    base_global_bonus: float = 0.0          # generic global dmg
+    base_inbattle_bonus: float = 0.0        # generic in-battle dmg
+    base_final_bonus: float = 0.0           # generic final dmg
+
+    # NEW: type-specific base multipliers
+    base_global_lightning_bonus: float = 0.0 # +X% global dmg to lightning hits
+    base_global_skill_bonus: float = 0.0    # +X% global dmg to skill hits
+    base_final_skill_bonus: float = 0.0     # +X% final dmg to skill hits
+    base_final_lightning_bonus: float = 0.0 # +X% final dmg to lightning hits
 
     # Damage accumulators
     dmg_basic: float = 0.0
@@ -42,6 +48,10 @@ class BattleState:
     rng: random.Random | None = None
 
 
+
+
+from dataclasses import dataclass, field
+from typing import Set
 
 from dataclasses import dataclass, field
 from typing import Set
@@ -58,18 +68,16 @@ class HitContext:
     atk_mult_adventurer: float = 1.0
     atk_mult_buff: float = 1.0
 
-    # Bracketed additive bonuses:
-    # final damage multiplier = (1 + global_bonus_total)
-    #                         * (1 + inbattle_bonus_total)
-    #                         * (1 + final_bonus_total)
-    global_bonus: float = 0.0       # generic global dmg%
-    inbattle_bonus: float = 0.0     # in-battle dmg%
-    final_bonus: float = 0.0        # final dmg%
+    # Bracketed additive bonuses (per-hit)
+    global_bonus: float = 0.0
+    inbattle_bonus: float = 0.0
+    final_bonus: float = 0.0
 
-    # Tags to mark hit type(s), e.g. {"basic"}, {"skill", "lightning"}
+    # Tags to describe hit type, e.g. {"basic"}, {"skill", "lightning"}
     tags: Set[str] = field(default_factory=set)
 
     damage_done: float = 0.0
+
 
 
 class Effect(Protocol):
@@ -94,9 +102,23 @@ def compute_hit_damage(ctx: HitContext, state: BattleState) -> float:
 
     atk_eff = ctx.atk_base * ctx.atk_mult_adventurer * ctx.atk_mult_buff
 
+    # --- Global bracket ---
     global_total = ctx.global_bonus + state.base_global_bonus
+    if "skill" in ctx.tags:
+        global_total += state.base_global_skill_bonus
+    if "lightning" in ctx.tags:
+        global_total += state.base_global_lightning_bonus
+
+    # --- In-battle bracket ---
     inbattle_total = ctx.inbattle_bonus + state.base_inbattle_bonus
+    # (later you can add type-specific in-battle here if you want)
+
+    # --- Final bracket ---
     final_total = ctx.final_bonus + state.base_final_bonus
+    if "skill" in ctx.tags:
+        final_total += state.base_final_skill_bonus
+    if "lightning" in ctx.tags:
+        final_total += state.base_final_lightning_bonus
 
     return (
         atk_eff
@@ -108,6 +130,7 @@ def compute_hit_damage(ctx: HitContext, state: BattleState) -> float:
     )
 
 
+
 def simulate_adventurer(
     adv_atk_mult: float,
     effects: List[Effect],
@@ -117,14 +140,22 @@ def simulate_adventurer(
     base_global_bonus: float = 0.0,
     base_inbattle_bonus: float = 0.0,
     base_final_bonus: float = 0.0,
+    base_global_skill_bonus: float = 0.0,
+    base_global_lightning_bonus: float = 0.0,
+    base_final_skill_bonus: float = 0.0,
+    base_final_lightning_bonus: float = 0.0,
 ) -> BattleState:
     state = BattleState()
     state.rng = random.Random(seed) if seed is not None else random.Random()
 
-    # NEW: store base bonuses in state
+    # Base multipliers from config
     state.base_global_bonus = base_global_bonus
     state.base_inbattle_bonus = base_inbattle_bonus
     state.base_final_bonus = base_final_bonus
+    state.base_global_skill_bonus = base_global_skill_bonus
+    state.base_global_lightning_bonus = base_global_lightning_bonus
+    state.base_final_skill_bonus = base_final_skill_bonus
+    state.base_final_lightning_bonus = base_final_lightning_bonus
 
     for r in range(1, rounds + 1):
         state.round_index = r
@@ -179,6 +210,10 @@ def simulate_adventurer_with_log(
     base_global_bonus: float = 0.0,
     base_inbattle_bonus: float = 0.0,
     base_final_bonus: float = 0.0,
+    base_global_skill_bonus: float = 0.0,
+    base_global_lightning_bonus: float = 0.0,
+    base_final_skill_bonus: float = 0.0,
+    base_final_lightning_bonus: float = 0.0,
 ):
     state = BattleState()
     state.rng = random.Random(seed) if seed is not None else random.Random()
@@ -186,6 +221,10 @@ def simulate_adventurer_with_log(
     state.base_global_bonus = base_global_bonus
     state.base_inbattle_bonus = base_inbattle_bonus
     state.base_final_bonus = base_final_bonus
+    state.base_global_skill_bonus = base_global_skill_bonus
+    state.base_global_lightning_bonus = base_global_lightning_bonus
+    state.base_final_skill_bonus = base_final_skill_bonus
+    state.base_final_lightning_bonus = base_final_lightning_bonus
 
     round_log = []
 
@@ -271,10 +310,17 @@ class SimulationConfig:
     basic_hits_per_round: int = 5
     seed: int | None = None
 
-    # NEW: base damage multipliers
-    base_global_bonus: float = 0.0      # e.g. +0.30 for +30% global dmg
-    base_inbattle_bonus: float = 0.0    # generic in-battle dmg
-    base_final_bonus: float = 0.0       # generic final dmg
+    # Base generic multipliers
+    base_global_bonus: float = 0.0
+    base_inbattle_bonus: float = 0.0
+    base_final_bonus: float = 0.0
+
+    # NEW: type-specific multipliers
+    base_global_skill_bonus: float = 0.0      # +X% global dmg to skills
+    base_global_lightning_bonus: float = 0.0   # +X% global dmg to lightning hits
+    base_final_skill_bonus: float = 0.0       # +X% final dmg to skills
+    base_final_lightning_bonus: float = 0.0   # +X% final dmg to lightning
+
 
 def build_effects_from_config(config: SimulationConfig):
     effects: List[Effect] = []
@@ -334,10 +380,15 @@ def run_simulation(config: SimulationConfig, with_log: bool = False):
         base_global_bonus=config.base_global_bonus,
         base_inbattle_bonus=config.base_inbattle_bonus,
         base_final_bonus=config.base_final_bonus,
+        base_global_skill_bonus=config.base_global_skill_bonus,
+        base_global_lightning_bonus=config.base_global_lightning_bonus,
+        base_final_skill_bonus=config.base_final_skill_bonus,
+        base_final_lightning_bonus=config.base_final_lightning_bonus,
     )
 
     if with_log:
         return simulate_adventurer_with_log(**common_kwargs)
     else:
         return simulate_adventurer(**common_kwargs)
+
 
