@@ -1,0 +1,23 @@
+# =========================
+# Template param (for txt/json)
+# =========================
+
+TEMPLATE_PARAMS = {
+    "adventurer": "DG",
+    "star": 8,
+    "weapon": "Nashir",
+    "combo_mastery": True,
+
+    "use_extra_end_bolts": True,
+    "extra_end_bolts_count": 3,
+    "basic_atk_bolt_level": 1,      # 0=off, 1=45%, 2=80%
+    "five_bolts_from_round6": True,
+
+    "rounds": 15,
+    "basic_hits_per_round": 5,
+    "seed": 12345,
+}
+
+# Example of using a dict from a param file:
+# cfg = SimulationConfig(**TEMPLATE_PARAMS)
+# state, log = run_simulation(cfg, with_log=True)
