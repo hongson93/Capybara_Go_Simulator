@@ -53,6 +53,14 @@ class BattleState:
     base_inbattle_skill_bonus: float = 0.0
     base_inbattle_lightning_bonus: float = 0.0
 
+    # NEW: Lightning Charge (dynamic in-battle lightning buff from bolts)
+    lightning_charge_step: float = 0.0              # per-bolt increment (0.06 or 0.10)
+    lightning_charge_stacks: int = 0                  # number of bolts hit in current cycle
+    dynamic_inbattle_lightning_bonus: float = 0.0   # accumulated bonus from bolts
+
+    # NEW: temporary final lightning bonus (e.g. Ezra Ring)
+    temp_final_lightning_bonus: float = 0.0
+
     # Damage accumulators
     dmg_basic: float = 0.0
     dmg_flame: float = 0.0
@@ -144,6 +152,8 @@ def debug_log_hit(
         "inbattle_total": inbattle_total,
         "final_total": final_total,
         "damage": dmg,
+        "lc_stacks": state.lightning_charge_stacks,            # NEW
+        "lc_bonus": state.dynamic_inbattle_lightning_bonus,    # NEW
     })
 
 
@@ -176,6 +186,7 @@ def compute_hit_damage(ctx: HitContext, state: BattleState) -> float:
         inbattle_total += state.base_inbattle_skill_bonus
     if "lightning" in ctx.tags:
         inbattle_total += state.base_inbattle_lightning_bonus
+        inbattle_total += state.dynamic_inbattle_lightning_bonus 
 
     # --- Final bracket ---
     final_total = ctx.final_bonus + state.base_final_bonus
@@ -183,6 +194,7 @@ def compute_hit_damage(ctx: HitContext, state: BattleState) -> float:
         final_total += state.base_final_skill_bonus
     if "lightning" in ctx.tags:
         final_total += state.base_final_lightning_bonus
+        final_total += state.temp_final_lightning_bonus
 
     dmg = (
         atk_eff
@@ -196,7 +208,16 @@ def compute_hit_damage(ctx: HitContext, state: BattleState) -> float:
     # Debug logging
     debug_log_hit(state, ctx, K, atk_eff, global_total, inbattle_total, final_total, dmg)
 
+    # Lightning Charge: after a bolt hit, increase stacks (up to 99) and recompute bonus
+    if "bolt" in ctx.tags and "lightning" in ctx.tags and state.lightning_charge_step > 0.0:
+        if state.lightning_charge_stacks < 99:
+            state.lightning_charge_stacks += 1
+            state.dynamic_inbattle_lightning_bonus = (
+                state.lightning_charge_stacks * state.lightning_charge_step
+            )
+
     return dmg
+
 
 
 # =========================
@@ -220,6 +241,7 @@ def simulate_adventurer(
     base_inbattle_skill_bonus: float = 0.0,
     base_inbattle_lightning_bonus: float = 0.0,
     debug: bool = False,
+    lightning_charge_step: float = 0.0,
 ) -> BattleState:
     state = BattleState()
     state.rng = random.Random(seed) if seed is not None else random.Random()
@@ -239,6 +261,11 @@ def simulate_adventurer(
     state.base_inbattle_basic_bonus = base_inbattle_basic_bonus
     state.base_inbattle_skill_bonus = base_inbattle_skill_bonus
     state.base_inbattle_lightning_bonus = base_inbattle_lightning_bonus
+
+    # NEW: Lightning Charge
+    state.lightning_charge_step = lightning_charge_step
+    state.dynamic_inbattle_lightning_bonus = 0.0
+    state.lightning_charge_stacks = 0
 
     for r in range(1, rounds + 1):
         state.round_index = r
@@ -270,18 +297,32 @@ def simulate_adventurer(
                 e.on_after_hit(state, ctx)
 
         # End-of-round phases
+        # 1) Adventurer end-of-round skills (e.g. Dragon Breath)
         for e in effects:
             if hasattr(e, "on_end_round_adventurer"):
                 e.on_end_round_adventurer(state)
+
+        # 2) End-of-round skill procs (e.g. extra bolts, per-round bolts)
         for e in effects:
             if hasattr(e, "on_end_round_skills"):
                 e.on_end_round_skills(state)
+
+        # 3) Buffs with round limit expire here
         for e in effects:
             if hasattr(e, "on_end_round_buffs_expire"):
                 e.on_end_round_buffs_expire(state)
+
+        # 🔄 Lightning Charge reset every 3 rounds,
+        # AFTER buffs expire, BEFORE charge release
+        if state.lightning_charge_step > 0.0 and (state.round_index % 3 == 0):
+            state.lightning_charge_stacks = 0
+            state.dynamic_inbattle_lightning_bonus = 0.0
+
+        # 4) Charge release (e.g. Nashir's 6 thunder bolts)
         for e in effects:
             if hasattr(e, "on_end_round_charge_release"):
                 e.on_end_round_charge_release(state)
+
 
     return state
 
@@ -303,6 +344,7 @@ def simulate_adventurer_with_log(
     base_inbattle_skill_bonus: float = 0.0,
     base_inbattle_lightning_bonus: float = 0.0,
     debug: bool = False,
+    lightning_charge_step: float = 0.0,
 ):
     state = BattleState()
     state.rng = random.Random(seed) if seed is not None else random.Random()
@@ -321,6 +363,11 @@ def simulate_adventurer_with_log(
     state.base_inbattle_basic_bonus = base_inbattle_basic_bonus
     state.base_inbattle_skill_bonus = base_inbattle_skill_bonus
     state.base_inbattle_lightning_bonus = base_inbattle_lightning_bonus
+
+    # NEW: Lightning Charge
+    state.lightning_charge_step = lightning_charge_step
+    state.dynamic_inbattle_lightning_bonus = 0.0
+    state.lightning_charge_stacks = 0
 
     round_log = []
 
@@ -360,18 +407,32 @@ def simulate_adventurer_with_log(
                 e.on_after_hit(state, ctx)
 
         # End-of-round phases
+        # 1) Adventurer end-of-round skills (e.g. Dragon Breath)
         for e in effects:
             if hasattr(e, "on_end_round_adventurer"):
                 e.on_end_round_adventurer(state)
+
+        # 2) End-of-round skill procs (e.g. extra bolts, per-round bolts)
         for e in effects:
             if hasattr(e, "on_end_round_skills"):
                 e.on_end_round_skills(state)
+
+        # 3) Buffs with round limit expire here
         for e in effects:
             if hasattr(e, "on_end_round_buffs_expire"):
                 e.on_end_round_buffs_expire(state)
+
+        # 🔄 Lightning Charge reset every 3 rounds,
+        # AFTER buffs expire, BEFORE charge release
+        if state.lightning_charge_step > 0.0 and (state.round_index % 3 == 0):
+            state.lightning_charge_stacks = 0
+            state.dynamic_inbattle_lightning_bonus = 0.0
+
+        # 4) Charge release (e.g. Nashir's 6 thunder bolts)
         for e in effects:
             if hasattr(e, "on_end_round_charge_release"):
                 e.on_end_round_charge_release(state)
+
 
         round_log.append({
             "round": r,
@@ -397,7 +458,8 @@ from model.skills.lightning import (
     FiveBoltsAfterRound6Effect,
 )
 from model.skills.combo_mastery import ComboMasteryEffect  # optional direct usage
-
+from model.skills.ezra_ring import EzraRingEffect
+from model.artifacts.arcane_tome import ArcaneTomeEffect
 
 @dataclass
 class SimulationConfig:
@@ -432,6 +494,17 @@ class SimulationConfig:
     base_inbattle_skill_bonus: float = 0.0
     base_inbattle_lightning_bonus: float = 0.0
 
+    # NEW: Lightning Charge per-bolt step
+    lightning_charge_step: float = 0.0  # 0.06 for base, 0.10 for upgrade
+    multiple_lightning_factor: int = 1
+
+    # NEW: Ezra Ring toggle & strength
+    use_ezra_ring: bool = False
+    ezra_final_light_bonus: float = 0.20  # +20% final lightning for 1 round
+
+    # NEW: Artifact system
+    artifact: Optional[str] = None      # e.g. "ArcaneTome"
+    artifact_level: int = 0            # 0 = off, 1 = base, 2 = upgraded
 
 def build_effects_from_config(config: SimulationConfig):
     effects: List[Effect] = []
@@ -454,12 +527,20 @@ def build_effects_from_config(config: SimulationConfig):
         nashir = NashirScepterEffect(adv_atk_mult=adv_atk_mult)
         effects.append(nashir)
 
+    # Ezra Ring
+    if config.use_ezra_ring:
+        effects.append(EzraRingEffect(
+            adv_atk_mult=adv_atk_mult,
+            final_light_bonus=config.ezra_final_light_bonus,
+        ))
+
     # Lightning skills
     if config.use_extra_end_bolts and config.extra_end_bolts_count > 0:
         effects.append(ExtraEndOfRoundBoltsEffect(
             adv_atk_mult=adv_atk_mult,
             n_bolts=config.extra_end_bolts_count,
             nashir=nashir,
+            multi_factor=config.multiple_lightning_factor,
         ))
 
     if config.basic_atk_bolt_level > 0:
@@ -468,13 +549,32 @@ def build_effects_from_config(config: SimulationConfig):
             adv_atk_mult=adv_atk_mult,
             chance=chance,
             nashir=nashir,
+            multi_factor=config.multiple_lightning_factor,
         ))
 
     if config.five_bolts_from_round6:
         effects.append(FiveBoltsAfterRound6Effect(
             adv_atk_mult=adv_atk_mult,
             nashir=nashir,
+            multi_factor=config.multiple_lightning_factor,
         ))
+
+    # Artifact
+    if config.artifact == "ArcaneTome" and config.artifact_level > 0:
+        if config.artifact_level == 1:
+            bolts_per_proc = 4
+            coeff = 5.0   # 500%
+        else:  # level 2 (upgrade)
+            bolts_per_proc = 3
+            coeff = 7.5   # 750%
+
+        effects.append(
+            ArcaneTomeEffect(
+                adv_atk_mult=adv_atk_mult,
+                bolts_per_proc=bolts_per_proc,
+                coeff=coeff,
+            )
+        )
 
     return effects, adv_atk_mult
 
@@ -499,6 +599,7 @@ def run_simulation(config: SimulationConfig, with_log: bool = False):
         base_inbattle_skill_bonus=config.base_inbattle_skill_bonus,
         base_inbattle_lightning_bonus=config.base_inbattle_lightning_bonus,
         debug=config.debug,
+        lightning_charge_step=config.lightning_charge_step,
     )
 
     if with_log:

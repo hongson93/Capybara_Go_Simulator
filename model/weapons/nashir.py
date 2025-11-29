@@ -81,7 +81,7 @@ class NashirScepterEffect(BaseEffect):
                 atk_mult_adventurer=self.adv_atk_mult,
                 atk_mult_buff=atk_mult_buff,
                 global_bonus=global_bonus,
-                tags={"skill", "lightning"}
+                tags={"skill", "lightning", "bolt"}
             )
             dmg = compute_hit_damage(bolt_ctx, state)
 
@@ -114,7 +114,7 @@ class NashirScepterEffect(BaseEffect):
                     atk_mult_adventurer=self.adv_atk_mult,
                     atk_mult_buff=atk_mult_buff,
                     global_bonus=global_bonus,
-                    tags={"skill", "lightning"},
+                    tags={"skill", "lightning", "bolt"},
                 )
                 dmg_thunder = compute_hit_damage(thunder_ctx, state)
                 M_bolt = self._bolt_mult()
