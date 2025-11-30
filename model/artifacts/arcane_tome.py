@@ -69,6 +69,8 @@ class ArcaneTomeEffect(BaseEffect):
             )
             if state.lightning_as_ninjutsu:
                 tome_ctx.tags.add("ninjutsu")
+            if state.lightning_as_demonic:
+                tome_ctx.tags.add("demonic")
             dmg = compute_hit_damage(tome_ctx, state)
             state.dmg_artifact += dmg
 

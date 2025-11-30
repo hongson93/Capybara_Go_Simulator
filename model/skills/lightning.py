@@ -40,6 +40,8 @@ class ExtraEndOfRoundBoltsEffect(BaseEffect):
                 tags = {"skill", "lightning", "bolt"}
                 if state.lightning_as_ninjutsu:
                     tags.add("ninjutsu")
+                if state.lightning_as_demonic:
+                    tags.add("demonic")
 
                 bolt_ctx = HitContext(
                     damage_type=DamageType.OTHER_SKILL,
@@ -96,6 +98,8 @@ class BasicAttackBoltEffect(BaseEffect):
                 tags = {"skill", "lightning", "bolt"}
                 if state.lightning_as_ninjutsu:
                     tags.add("ninjutsu")
+                if state.lightning_as_demonic:
+                    tags.add("demonic")
 
                 bolt_ctx = HitContext(
                     damage_type=DamageType.OTHER_SKILL,
@@ -146,6 +150,8 @@ class FiveBoltsAfterRound6Effect(BaseEffect):
                 tags = {"skill", "lightning", "bolt"}
                 if state.lightning_as_ninjutsu:
                     tags.add("ninjutsu")
+                if state.lightning_as_demonic:
+                    tags.add("demonic")
 
                 bolt_ctx = HitContext(
                     damage_type=DamageType.OTHER_SKILL,

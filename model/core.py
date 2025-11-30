@@ -24,6 +24,10 @@ class DamageType:
     HURRICANE = "hurricane"
     ULTIMATE = "ultimate"
 
+    # Daji-specific type
+    DEMONIC_AURA = "demonic_aura"
+    FLAME_FOX = "fox_flame"
+
 
 # =========================
 # Battle state & hit context
@@ -52,6 +56,7 @@ class BattleState:
     base_global_skill_bonus: float = 0.0       # +X% global dmg to skill hits
     base_global_ninjutsu_bonus: float = 0.0    # +X% global dmg to ninjutsu hits
     base_global_combo_bonus: float = 0.0      # +X% global dmg to combo hits
+    base_global_demonic_bonus: float = 0.0    # +X% global dmg to demonic hits
 
     base_final_skill_bonus: float = 0.0        # +X% final dmg to skill hits
     base_final_lightning_bonus: float = 0.0    # +X% final dmg to lightning hits
@@ -75,10 +80,21 @@ class BattleState:
     # Leo 5★: lightning hits gain "ninjutsu" tag
     lightning_as_ninjutsu: bool = False
 
+    # Daji: Demonic Aura global bonus and lightning-as-demonic flag
+    dynamic_global_demonic_bonus: float = 0.0   # Daji 10★ sets +0.6 here
+    lightning_as_demonic: bool = False          # Daji 5★ + Fox form
+
+    # Daji form / aura state
+    daji_aura_stacks: int = 0
+    daji_fox_form_active: bool = False
+    daji_fox_form_expires_after_round: int = 0
+    daji_fox_first_skill_pending: bool = False
+
     # Damage accumulators
     dmg_basic: float = 0.0
     dmg_flame: float = 0.0
     dmg_breath: float = 0.0
+    dmg_demonic: float = 0.0
     dmg_other: float = 0.0
     dmg_bolt: float = 0.0
     dmg_artifact: float = 0.0
@@ -87,6 +103,9 @@ class BattleState:
     dmg_ninjutsu: float = 0.0     # 0*/2* ninjutsu procs
     dmg_hurricane: float = 0.0    # 4*/7* hurricane hits
     dmg_ultimate: float = 0.0     # 8*/10* charge-release ninjutsu
+
+    # daji-specific breakdown
+    dmg_fox_flame: float = 0.0
 
     rng: Optional[random.Random] = None
 
@@ -203,6 +222,9 @@ def compute_hit_damage(ctx: HitContext, state: BattleState) -> float:
     if "ninjutsu" in ctx.tags:
         global_total += state.base_global_ninjutsu_bonus
         global_total += state.dynamic_global_ninjutsu_bonus
+    if "demonic" in ctx.tags:
+        global_total += state.base_global_demonic_bonus
+        global_total += state.dynamic_global_demonic_bonus
     if "combo" in ctx.tags:
         global_total += state.base_global_combo_bonus
 
@@ -265,6 +287,7 @@ def simulate_adventurer(
     base_global_lightning_bonus: float = 0.0,
     base_global_ninjutsu_bonus: float = 0.0,
     base_global_combo_bonus: float = 0.0,
+    base_global_demonic_bonus: float = 0.0,
     base_final_skill_bonus: float = 0.0,
     base_final_lightning_bonus: float = 0.0,
     base_inbattle_basic_bonus: float = 0.0,
@@ -288,6 +311,7 @@ def simulate_adventurer(
     state.base_global_lightning_bonus = base_global_lightning_bonus
     state.base_global_ninjutsu_bonus = base_global_ninjutsu_bonus
     state.base_global_combo_bonus = base_global_combo_bonus
+    state.base_global_demonic_bonus = base_global_demonic_bonus
 
     state.base_final_skill_bonus = base_final_skill_bonus
     state.base_final_lightning_bonus = base_final_lightning_bonus
@@ -381,6 +405,7 @@ def simulate_adventurer_with_log(
     base_global_lightning_bonus: float = 0.0,
     base_global_ninjutsu_bonus: float = 0.0,
     base_global_combo_bonus: float = 0.0,
+    base_global_demonic_bonus: float = 0.0,
     base_final_skill_bonus: float = 0.0,
     base_final_lightning_bonus: float = 0.0,
     base_inbattle_basic_bonus: float = 0.0,
@@ -404,6 +429,7 @@ def simulate_adventurer_with_log(
     state.base_global_lightning_bonus = base_global_lightning_bonus
     state.base_global_ninjutsu_bonus = base_global_ninjutsu_bonus
     state.base_global_combo_bonus = base_global_combo_bonus
+    state.base_global_demonic_bonus = base_global_demonic_bonus
 
     state.base_final_skill_bonus = base_final_skill_bonus
     state.base_final_lightning_bonus = base_final_lightning_bonus
@@ -436,6 +462,8 @@ def simulate_adventurer_with_log(
         ninj0 = state.dmg_ninjutsu
         hur0 = state.dmg_hurricane
         ult0 = state.dmg_ultimate
+        demonic0 = state.dmg_demonic
+        flame_fox0 = state.dmg_flame_fox
 
         # Round start
         for e in effects:
@@ -514,6 +542,16 @@ def simulate_adventurer_with_log(
                 "bolt":   state.dmg_bolt   - bolt0,
                 "other":  state.dmg_other  - other0,
             }
+        elif adventurer == "Daji":
+            entry = {
+                "round": r,
+                "basic": state.dmg_basic - b0,
+                "demonic": state.dmg_demonic - demonic0,
+                "flame_fox": state.dmg_flame_fox - flame_fox0,
+                "bolt": state.dmg_bolt - bolt0,
+                "other": state.dmg_other - other0,
+            }
+
         else:
             # Fallback for future adventurers: generic view
             entry = {
@@ -534,6 +572,7 @@ def simulate_adventurer_with_log(
 
 from model.adventurers.dragon_girl import dg_effects_for_star
 from model.adventurers.leo import leo_effects_for_star
+from model.adventurers.daji import daji_effects_for_star
 from model.weapons.nashir import NashirScepterEffect
 from model.skills.lightning import (
     ExtraEndOfRoundBoltsEffect,
@@ -572,6 +611,7 @@ class SimulationConfig:
     base_global_lightning_bonus: float = 0.0
     base_global_ninjutsu_bonus: float = 0.0
     base_global_combo_bonus: float = 0.0
+    base_global_demonic_bonus: float = 0.0
     base_final_skill_bonus: float = 0.0
     base_final_lightning_bonus: float = 0.0
 
@@ -605,6 +645,7 @@ def build_effects_from_config(config: SimulationConfig):
         adv_atk_mult = 1.10
     elif config.adventurer == "Daji":
         adv_atk_mult = 1.15
+        effects.extend(daji_effects_for_star(config.star, config.combo_mastery))
     else:
         adv_atk_mult = 1.0
 
@@ -698,6 +739,7 @@ def run_simulation(config: SimulationConfig, with_log: bool = False):
         base_global_lightning_bonus=config.base_global_lightning_bonus,
         base_global_ninjutsu_bonus=config.base_global_ninjutsu_bonus,
         base_global_combo_bonus=config.base_global_combo_bonus,
+        base_global_demonic_bonus=config.base_global_demonic_bonus,
         base_final_skill_bonus=config.base_final_skill_bonus,
         base_final_lightning_bonus=config.base_final_lightning_bonus,
         base_inbattle_basic_bonus=config.base_inbattle_basic_bonus,
