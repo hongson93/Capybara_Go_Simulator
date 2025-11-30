@@ -463,7 +463,7 @@ def simulate_adventurer_with_log(
         hur0 = state.dmg_hurricane
         ult0 = state.dmg_ultimate
         demonic0 = state.dmg_demonic
-        flame_fox0 = state.dmg_flame_fox
+        flame_fox0 = state.dmg_fox_flame
 
         # Round start
         for e in effects:
@@ -547,7 +547,7 @@ def simulate_adventurer_with_log(
                 "round": r,
                 "basic": state.dmg_basic - b0,
                 "demonic": state.dmg_demonic - demonic0,
-                "flame_fox": state.dmg_flame_fox - flame_fox0,
+                "flame_fox": state.dmg_fox_flame - flame_fox0,
                 "bolt": state.dmg_bolt - bolt0,
                 "other": state.dmg_other - other0,
             }
@@ -783,6 +783,16 @@ def get_damage_breakdown(state: BattleState, adventurer: str = "DG") -> Dict[str
             "basic":     state.dmg_basic,
             "ninjutsu":  state.dmg_ninjutsu,
             "hurricane": state.dmg_hurricane,
+            "ultimate":  state.dmg_ultimate,
+            "bolt":      state.dmg_bolt,
+            "artifact":  state.dmg_artifact,
+            "other":     state.dmg_other,
+        }
+    elif adventurer == "Daji":
+        categories = {
+            "basic":     state.dmg_basic,
+            "demonic":   state.dmg_demonic,
+            "fox_flame": state.dmg_fox_flame,
             "ultimate":  state.dmg_ultimate,
             "bolt":      state.dmg_bolt,
             "artifact":  state.dmg_artifact,

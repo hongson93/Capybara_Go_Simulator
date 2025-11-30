@@ -56,62 +56,40 @@ class DajiFormEffect(BaseEffect):
     # ---------------------------
 
     def _enter_fox_form(self, state: BattleState, expire_after_round: int) -> None:
-        """
-        Put Daji into Fox Form until the end of 'expire_after_round'.
-        This also:
-          - enables lightning-as-demonic (if star >= 5)
-          - enables bolt coeff buff (if star >= 4)
-          - triggers Fox Flame (if star >= 4)
-          - applies the 0★ 'first skill 1100%' extra Demonic Aura hit,
-            treating Fox Flame as that first skill.
-        """
         if state.daji_fox_form_active:
-            # Already in Fox Form; don't re-enter.
             return
 
         state.daji_fox_form_active = True
         state.daji_fox_form_expires_after_round = expire_after_round
-        # First skill in this form is pending; in this implementation we
-        # immediately consume it with Fox Flame when 4★ is active.
-        state.daji_fox_first_skill_pending = True
 
         # 5★: lightning skills in Fox Form gain Demonic Aura tag
         if self.star >= 5:
             state.lightning_as_demonic = True
 
+        # 0★: On entering Fox Form, deal 1100% Demonic Aura as the “first skill”
+        extra_ctx = HitContext(
+            damage_type=DamageType.DEMONIC_AURA,
+            coeff=11.0,  # 1100%
+            atk_mult_adventurer=self.adv_atk_mult,
+            global_bonus=state.breath_global_this,
+            tags={"skill", "demonic"},
+        )
+        dmg_extra = compute_hit_damage(extra_ctx, state)
+        state.dmg_demonic += dmg_extra
+
         # 4★ / 7★: Fox Flame on transform
         if self.star >= 4:
-            # 1200% at 4★/5★/6★, upgraded to 3600% at 7★+
             coeff = 12.0 if self.star < 7 else 36.0
 
             flame_ctx = HitContext(
                 damage_type=DamageType.FLAME_FOX,
                 coeff=coeff,
                 atk_mult_adventurer=self.adv_atk_mult,
-                # treat as a generic skill; use breath_global_this like other skills
                 global_bonus=state.breath_global_this,
                 tags={"skill", "demonic"},
             )
             dmg_flame = compute_hit_damage(flame_ctx, state)
             state.dmg_fox_flame += dmg_flame
-
-            # 0★: In Fox Form, first skill deals extra 1100% Demonic Aura.
-            # We treat Fox Flame itself as that first skill.
-            if state.daji_fox_first_skill_pending:
-                extra_ctx = HitContext(
-                    damage_type=DamageType.DEMONIC_AURA,
-                    coeff=11.0,  # 1100%
-                    atk_mult_adventurer=self.adv_atk_mult,
-                    global_bonus=state.breath_global_this,
-                    tags={"skill", "demonic"},
-                )
-                dmg_extra = compute_hit_damage(extra_ctx, state)
-                state.dmg_demonic += dmg_extra
-                state.daji_fox_first_skill_pending = False
-
-        # If 4★ not unlocked, we keep daji_fox_first_skill_pending = True.
-        # In this ABM, there are no other Daji-native skills that go through
-        # the generic hit loop, so this flag won't matter until 4★ anyway.
 
     def _leave_fox_form(self, state: BattleState) -> None:
         """
@@ -148,9 +126,8 @@ class DajiFormEffect(BaseEffect):
 
     def on_before_hit(self, state: BattleState, ctx: HitContext) -> None:
         # 4★: While in Fox Form, buff all bolt coefficients by +60%.
-        # Implemented as a 1.6× multiplicative factor on coeff.
         if self.star >= 4 and state.daji_fox_form_active and "bolt" in ctx.tags:
-            ctx.coeff *= 1.6
+            ctx.coeff += 0.6
 
     def on_end_round_buffs_expire(self, state: BattleState) -> None:
         """
