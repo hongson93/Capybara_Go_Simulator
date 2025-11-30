@@ -72,9 +72,9 @@ class NashirScepterEffect(BaseEffect):
         for _ in range(count):
             is_thunder = rng.random() < 0.5
             if is_thunder:
-                coeff = self._thunder_coeff()
+                coeff = self._thunder_coeff() + state.daji_bolt_coeff_bonus
             else:
-                coeff = self.base_lightning_coeff
+                coeff = self.base_lightning_coeff + state.daji_bolt_coeff_bonus
 
             tags = {"skill", "lightning", "bolt"}
             if state.lightning_as_ninjutsu:

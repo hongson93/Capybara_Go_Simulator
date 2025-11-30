@@ -45,7 +45,7 @@ class ExtraEndOfRoundBoltsEffect(BaseEffect):
 
                 bolt_ctx = HitContext(
                     damage_type=DamageType.OTHER_SKILL,
-                    coeff=0.30,  # 30% lightning
+                    coeff=0.30 + state.daji_bolt_coeff_bonus,  # 30% lightning + Daji 4★ bonus
                     atk_mult_adventurer=self.adv_atk_mult,
                     atk_mult_buff=atk_mult_buff,
                     # breath_global_this and base_* bonuses are handled in compute_hit_damage
@@ -103,7 +103,7 @@ class BasicAttackBoltEffect(BaseEffect):
 
                 bolt_ctx = HitContext(
                     damage_type=DamageType.OTHER_SKILL,
-                    coeff=0.30,
+                    coeff=0.30 + state.daji_bolt_coeff_bonus,  # 30% lightning + Daji 4★ bonus
                     atk_mult_adventurer=self.adv_atk_mult,
                     atk_mult_buff=atk_mult_buff,
                     global_bonus=state.breath_global_this,
@@ -155,7 +155,7 @@ class FiveBoltsAfterRound6Effect(BaseEffect):
 
                 bolt_ctx = HitContext(
                     damage_type=DamageType.OTHER_SKILL,
-                    coeff=0.30,
+                    coeff=0.30 + state.daji_bolt_coeff_bonus,  # 30% lightning + Daji 4★ bonus
                     atk_mult_adventurer=self.adv_atk_mult,
                     atk_mult_buff=atk_mult_buff,
                     global_bonus=state.breath_global_this,

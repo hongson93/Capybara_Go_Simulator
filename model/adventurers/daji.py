@@ -1,4 +1,6 @@
 from typing import List
+
+from panel import state
 from model.core import (
     BaseEffect,
     BattleState,
@@ -65,6 +67,12 @@ class DajiFormEffect(BaseEffect):
         # 5★: lightning skills in Fox Form gain Demonic Aura tag
         if self.star >= 5:
             state.lightning_as_demonic = True
+        
+        # 4★: set bolt +0.6 coeff bonus while in Fox form
+        if self.star >= 4:
+            state.daji_bolt_coeff_bonus = 0.6
+        else:
+            state.daji_bolt_coeff_bonus = 0.0
 
         # 0★: On entering Fox Form, deal 1100% Demonic Aura as the “first skill”
         extra_ctx = HitContext(
@@ -108,6 +116,9 @@ class DajiFormEffect(BaseEffect):
         # 5★: lightning-as-demonic only during Fox Form
         state.lightning_as_demonic = False
 
+        # 4★: remove bolt coeff bonus when leaving Fox form
+        state.daji_bolt_coeff_bonus = 0.0
+
     # ---------------------------
     # Battle lifecycle hooks
     # ---------------------------
@@ -125,9 +136,7 @@ class DajiFormEffect(BaseEffect):
             self.initial_fox_applied = True
 
     def on_before_hit(self, state: BattleState, ctx: HitContext) -> None:
-        # 4★: While in Fox Form, buff all bolt coefficients by +60%.
-        if self.star >= 4 and state.daji_fox_form_active and "bolt" in ctx.tags:
-            ctx.coeff += 0.6
+        pass
 
     def on_end_round_buffs_expire(self, state: BattleState) -> None:
         """

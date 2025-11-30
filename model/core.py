@@ -83,6 +83,7 @@ class BattleState:
     # Daji: Demonic Aura global bonus and lightning-as-demonic flag
     dynamic_global_demonic_bonus: float = 0.0   # Daji 10★ sets +0.6 here
     lightning_as_demonic: bool = False          # Daji 5★ + Fox form
+    daji_bolt_coeff_bonus: float = 0.0      # Daji 4★ + Fox form
 
     # Daji form / aura state
     daji_aura_stacks: int = 0
