@@ -67,6 +67,8 @@ class ArcaneTomeEffect(BaseEffect):
                 global_bonus=state.breath_global_this,
                 tags={"skill", "lightning", "artifact"},
             )
+            if state.lightning_as_ninjutsu:
+                tome_ctx.tags.add("ninjutsu")
             dmg = compute_hit_damage(tome_ctx, state)
             state.dmg_artifact += dmg
 

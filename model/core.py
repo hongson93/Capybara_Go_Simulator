@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Protocol, Set, Optional
+from typing import List, Protocol, Set, Optional, Dict, Tuple
 import random
 
 # =========================
@@ -23,7 +23,6 @@ class DamageType:
     NINJUTSU = "ninjutsu"
     HURRICANE = "hurricane"
     ULTIMATE = "ultimate"
-
 
 
 # =========================
@@ -52,6 +51,7 @@ class BattleState:
     base_global_lightning_bonus: float = 0.0   # +X% global dmg to lightning hits
     base_global_skill_bonus: float = 0.0       # +X% global dmg to skill hits
     base_global_ninjutsu_bonus: float = 0.0    # +X% global dmg to ninjutsu hits
+    base_global_combo_bonus: float = 0.0      # +X% global dmg to combo hits
 
     base_final_skill_bonus: float = 0.0        # +X% final dmg to skill hits
     base_final_lightning_bonus: float = 0.0    # +X% final dmg to lightning hits
@@ -79,14 +79,14 @@ class BattleState:
     dmg_basic: float = 0.0
     dmg_flame: float = 0.0
     dmg_breath: float = 0.0
-    dmg_other: float = 0.0        # generic misc skill damage
+    dmg_other: float = 0.0
     dmg_bolt: float = 0.0
     dmg_artifact: float = 0.0
 
-    # Leo-specific breakdowns
-    dmg_ninjutsu: float = 0.0     # 0★/2★ ninjutsu procs
-    dmg_hurricane: float = 0.0    # 4★/7★ Hurricane
-    dmg_ultimate: float = 0.0     # 8★/10★ charge-release
+    # Leo-specific breakdown
+    dmg_ninjutsu: float = 0.0     # 0*/2* ninjutsu procs
+    dmg_hurricane: float = 0.0    # 4*/7* hurricane hits
+    dmg_ultimate: float = 0.0     # 8*/10* charge-release ninjutsu
 
     rng: Optional[random.Random] = None
 
@@ -203,6 +203,9 @@ def compute_hit_damage(ctx: HitContext, state: BattleState) -> float:
     if "ninjutsu" in ctx.tags:
         global_total += state.base_global_ninjutsu_bonus
         global_total += state.dynamic_global_ninjutsu_bonus
+    if "combo" in ctx.tags:
+        global_total += state.base_global_combo_bonus
+
 
     # --- In-battle bracket ---
     inbattle_total = ctx.inbattle_bonus + state.base_inbattle_bonus
@@ -261,6 +264,7 @@ def simulate_adventurer(
     base_global_skill_bonus: float = 0.0,
     base_global_lightning_bonus: float = 0.0,
     base_global_ninjutsu_bonus: float = 0.0,
+    base_global_combo_bonus: float = 0.0,
     base_final_skill_bonus: float = 0.0,
     base_final_lightning_bonus: float = 0.0,
     base_inbattle_basic_bonus: float = 0.0,
@@ -283,6 +287,7 @@ def simulate_adventurer(
     state.base_global_skill_bonus = base_global_skill_bonus
     state.base_global_lightning_bonus = base_global_lightning_bonus
     state.base_global_ninjutsu_bonus = base_global_ninjutsu_bonus
+    state.base_global_combo_bonus = base_global_combo_bonus
 
     state.base_final_skill_bonus = base_final_skill_bonus
     state.base_final_lightning_bonus = base_final_lightning_bonus
@@ -309,6 +314,10 @@ def simulate_adventurer(
 
         # Basic attacks + combos
         for h in range(1, basic_hits_per_round + 1):
+            tags = {"basic"}
+            if h >= 2:
+                tags.add("combo")
+
             ctx = HitContext(
                 damage_type=DamageType.BASIC,
                 coeff=1.0,
@@ -316,7 +325,7 @@ def simulate_adventurer(
                 is_combo=(h >= 2),
                 hit_index_in_round=h,
                 atk_mult_adventurer=adv_atk_mult,
-                tags={"basic"},
+                tags=tags,
             )
 
             for e in effects:
@@ -371,6 +380,7 @@ def simulate_adventurer_with_log(
     base_global_skill_bonus: float = 0.0,
     base_global_lightning_bonus: float = 0.0,
     base_global_ninjutsu_bonus: float = 0.0,
+    base_global_combo_bonus: float = 0.0,
     base_final_skill_bonus: float = 0.0,
     base_final_lightning_bonus: float = 0.0,
     base_inbattle_basic_bonus: float = 0.0,
@@ -378,6 +388,7 @@ def simulate_adventurer_with_log(
     base_inbattle_lightning_bonus: float = 0.0,
     debug: bool = False,
     lightning_charge_step: float = 0.0,
+    adventurer: str = "DG",
 ):
     state = BattleState()
     state.effects = effects
@@ -392,6 +403,7 @@ def simulate_adventurer_with_log(
     state.base_global_skill_bonus = base_global_skill_bonus
     state.base_global_lightning_bonus = base_global_lightning_bonus
     state.base_global_ninjutsu_bonus = base_global_ninjutsu_bonus
+    state.base_global_combo_bonus = base_global_combo_bonus
 
     state.base_final_skill_bonus = base_final_skill_bonus
     state.base_final_lightning_bonus = base_final_lightning_bonus
@@ -414,11 +426,16 @@ def simulate_adventurer_with_log(
     for r in range(1, rounds + 1):
         state.round_index = r
 
+        # Baselines for per-round deltas
         b0 = state.dmg_basic
         f0 = state.dmg_flame
         br0 = state.dmg_breath
         bolt0 = state.dmg_bolt
         other0 = state.dmg_other
+
+        ninj0 = state.dmg_ninjutsu
+        hur0 = state.dmg_hurricane
+        ult0 = state.dmg_ultimate
 
         # Round start
         for e in effects:
@@ -426,6 +443,10 @@ def simulate_adventurer_with_log(
 
         # Basic attacks + combos
         for h in range(1, basic_hits_per_round + 1):
+            tags = {"basic"}
+            if h >= 2:
+                tags.add("combo")
+
             ctx = HitContext(
                 damage_type=DamageType.BASIC,
                 coeff=1.0,
@@ -433,7 +454,7 @@ def simulate_adventurer_with_log(
                 is_combo=(h >= 2),
                 hit_index_in_round=h,
                 atk_mult_adventurer=adv_atk_mult,
-                tags={"basic"},
+                tags=tags,
             )
 
             for e in effects:
@@ -473,14 +494,36 @@ def simulate_adventurer_with_log(
             if hasattr(e, "on_end_round_charge_release"):
                 e.on_end_round_charge_release(state)
 
-        round_log.append({
-            "round": r,
-            "basic":  state.dmg_basic  - b0,
-            "flame":  state.dmg_flame  - f0,
-            "breath": state.dmg_breath - br0,
-            "bolt":   state.dmg_bolt   - bolt0,
-            "other":  state.dmg_other  - other0,
-        })
+        # Adventurer-specific logging
+        if adventurer == "Leo":
+            entry = {
+                "round": r,
+                "basic":     state.dmg_basic     - b0,
+                "ninjutsu":  state.dmg_ninjutsu - ninj0,
+                "hurricane": state.dmg_hurricane - hur0,
+                "ultimate":  state.dmg_ultimate - ult0,
+                "bolt":      state.dmg_bolt      - bolt0,
+                "other":     state.dmg_other     - other0,
+            }
+        elif adventurer == "DG":
+            entry = {
+                "round": r,
+                "basic":  state.dmg_basic  - b0,
+                "flame":  state.dmg_flame  - f0,
+                "breath": state.dmg_breath - br0,
+                "bolt":   state.dmg_bolt   - bolt0,
+                "other":  state.dmg_other  - other0,
+            }
+        else:
+            # Fallback for future adventurers: generic view
+            entry = {
+                "round": r,
+                "basic": state.dmg_basic - b0,
+                "bolt":  state.dmg_bolt  - bolt0,
+                "other": state.dmg_other - other0,
+            }
+
+        round_log.append(entry)
 
     return state, round_log
 
@@ -528,6 +571,7 @@ class SimulationConfig:
     base_global_skill_bonus: float = 0.0
     base_global_lightning_bonus: float = 0.0
     base_global_ninjutsu_bonus: float = 0.0
+    base_global_combo_bonus: float = 0.0
     base_final_skill_bonus: float = 0.0
     base_final_lightning_bonus: float = 0.0
 
@@ -570,6 +614,10 @@ def build_effects_from_config(config: SimulationConfig):
         nashir = NashirScepterEffect(adv_atk_mult=adv_atk_mult)
         effects.append(nashir)
 
+    # Combo Mastery (make sure it’s applied if enabled)
+    if config.combo_mastery:
+        effects.append(ComboMasteryEffect())
+
     # Ezra Ring
     if config.use_ezra_ring:
         effects.append(EzraRingEffect(
@@ -589,9 +637,9 @@ def build_effects_from_config(config: SimulationConfig):
     if config.basic_atk_bolt_level > 0:
         # Base chances
         if config.basic_atk_bolt_level == 1:
-            chance = 0.45
+            chance = 0.60  # 60%
         else:  # level 2 (upgrade)
-            chance = 0.75  # corrected: 75%, not 80%
+            chance = 0.85  # 85%
 
         # Leo passive: improved on-hit chance
         if config.adventurer == "Leo":
@@ -649,6 +697,7 @@ def run_simulation(config: SimulationConfig, with_log: bool = False):
         base_global_skill_bonus=config.base_global_skill_bonus,
         base_global_lightning_bonus=config.base_global_lightning_bonus,
         base_global_ninjutsu_bonus=config.base_global_ninjutsu_bonus,
+        base_global_combo_bonus=config.base_global_combo_bonus,
         base_final_skill_bonus=config.base_final_skill_bonus,
         base_final_lightning_bonus=config.base_final_lightning_bonus,
         base_inbattle_basic_bonus=config.base_inbattle_basic_bonus,
@@ -659,6 +708,89 @@ def run_simulation(config: SimulationConfig, with_log: bool = False):
     )
 
     if with_log:
-        return simulate_adventurer_with_log(**common_kwargs)
+        return simulate_adventurer_with_log(
+            adventurer=config.adventurer,
+            **common_kwargs,
+        )
     else:
         return simulate_adventurer(**common_kwargs)
+
+
+# =========================
+# Damage breakdown helpers
+# =========================
+
+def get_damage_breakdown(state: BattleState, adventurer: str = "DG") -> Dict[str, float]:
+    """
+    Return raw damage per category for the given adventurer.
+    Keys depend on the adventurer so logs are meaningful.
+    """
+    adventurer = adventurer or "DG"
+
+    if adventurer == "DG":
+        categories = {
+            "basic":    state.dmg_basic,
+            "flame":    state.dmg_flame,
+            "breath":   state.dmg_breath,
+            "bolt":     state.dmg_bolt,
+            "artifact": state.dmg_artifact,
+            "other":    state.dmg_other,
+        }
+    elif adventurer == "Leo":
+        categories = {
+            "basic":     state.dmg_basic,
+            "ninjutsu":  state.dmg_ninjutsu,
+            "hurricane": state.dmg_hurricane,
+            "ultimate":  state.dmg_ultimate,
+            "bolt":      state.dmg_bolt,
+            "artifact":  state.dmg_artifact,
+            "other":     state.dmg_other,
+        }
+    else:
+        # Fallback for future adventurers: generic buckets only
+        categories = {
+            "basic":    state.dmg_basic,
+            "bolt":     state.dmg_bolt,
+            "artifact": state.dmg_artifact,
+            "other":    state.dmg_other,
+        }
+
+    # Filter out strictly zero entries to keep output clean
+    return {k: v for k, v in categories.items() if v != 0.0}
+
+
+def summarize_damage(state: BattleState, adventurer: str = "DG") -> Tuple[float, Dict[str, Tuple[float, float]]]:
+    """
+    Returns:
+        total_damage,
+        {category: (absolute_damage, percentage_of_total)}
+    """
+    categories = get_damage_breakdown(state, adventurer)
+    total = sum(categories.values())
+
+    if total <= 0.0:
+        return 0.0, {k: (v, 0.0) for k, v in categories.items()}
+
+    summary: Dict[str, Tuple[float, float]] = {}
+    for name, value in categories.items():
+        pct = 100.0 * value / total
+        summary[name] = (value, pct)
+
+    return total, summary
+
+
+def print_damage_breakdown(state: BattleState, adventurer: str = "DG") -> None:
+    """
+    Pretty-print a damage breakdown table for one adventurer.
+    """
+    total, summary = summarize_damage(state, adventurer)
+
+    print(f"=== Damage breakdown for {adventurer} ===")
+    print(f"Total damage: {total:.2f}")
+    if total <= 0.0:
+        print("(no damage)")
+        return
+
+    # Sort by absolute damage, descending
+    for name, (value, pct) in sorted(summary.items(), key=lambda kv: kv[1][0], reverse=True):
+        print(f"- {name:10s}: {value:12.2f}  ({pct:5.1f}%)")

@@ -48,6 +48,9 @@ class LeoMultiHitNinjutsuEffect(BaseEffect):
 
         for part_coeff in basic_parts:
             # BASIC sub-hit
+            tags = {"basic"}
+            if ctx.is_combo:
+                tags.add("combo")
             basic_ctx = HitContext(
                 damage_type=DamageType.BASIC,
                 coeff=part_coeff,
@@ -58,7 +61,7 @@ class LeoMultiHitNinjutsuEffect(BaseEffect):
                 atk_mult_adventurer=self.adv_atk_mult,
                 atk_mult_buff=ctx.atk_mult_buff,
                 global_bonus=ctx.global_bonus,
-                tags={"basic"},
+                tags=tags,
             )
             dmg_basic = compute_hit_damage(basic_ctx, state)
             state.dmg_basic += dmg_basic
@@ -66,6 +69,10 @@ class LeoMultiHitNinjutsuEffect(BaseEffect):
             # 2★: 70% chance to proc ninjutsu of same coeff
             if self.has_2star:
                 if rng.random() < 0.70:
+                    tags = {"skill", "ninjutsu", "basic"}
+                    if ctx.is_combo:
+                        tags.add("combo")   # extra ninjutsu from combo gets combo bonus
+
                     ninj_ctx = HitContext(
                         damage_type=DamageType.NINJUTSU,
                         coeff=part_coeff,
@@ -73,11 +80,10 @@ class LeoMultiHitNinjutsuEffect(BaseEffect):
                         atk_mult_adventurer=self.adv_atk_mult,
                         atk_mult_buff=ctx.atk_mult_buff,
                         global_bonus=ctx.global_bonus,
-                        tags={"skill", "ninjutsu", "basic"},
+                        tags=tags,
                     )
                     dmg_ninj = compute_hit_damage(ninj_ctx, state)
                     state.dmg_ninjutsu += dmg_ninj
-
 
         # 0★/2★: after the 3 hits, always 1× 100% ninjutsu
         ninj_final_ctx = HitContext(

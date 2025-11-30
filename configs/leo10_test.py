@@ -11,11 +11,11 @@ cfg_leo_tome = SimulationConfig(
     # Lightning skills
     use_extra_end_bolts=True,  # keep these off so Tome stands out clearly
     extra_end_bolts_count=3,
-    basic_atk_bolt_level=0,     # upgraded basic attack bolt
+    basic_atk_bolt_level=1,     # upgraded basic attack bolt
     five_bolts_from_round6=False,
 
     # Battle length / RNG
-    rounds=10,
+    rounds=15,
     basic_hits_per_round=5,
     seed=42,
 
@@ -23,7 +23,7 @@ cfg_leo_tome = SimulationConfig(
     base_global_bonus=0.0,
     base_inbattle_bonus=0.0,
     base_final_bonus=0.26,            # +26% final damage (all hits)
-    base_global_skill_bonus=0.16,     # +16% global skill damage
+    base_global_skill_bonus=0.56,     # +16% global skill damage
     base_global_lightning_bonus=0.30,  # +30% global lightning damage
     base_global_ninjutsu_bonus=0.0,
     base_global_combo_bonus=1.0,     # +100% global combo damage
@@ -35,7 +35,7 @@ cfg_leo_tome = SimulationConfig(
 
     # Lightning Charge
     lightning_charge_step=0,     # or 0.10 if you want upgraded LC
-    multiple_lightning_factor=0,
+    multiple_lightning_factor=1,
 
     # Ezra Ring
     use_ezra_ring=True,            # off for this example
